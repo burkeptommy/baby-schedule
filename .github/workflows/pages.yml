@@ -16,6 +16,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  # Silence the Node 20 deprecation warning on checkout / configure-pages.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   deploy:
     environment:
@@ -28,6 +32,10 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Automatically enable Pages + create the github-pages environment
+          # on the first run, so no manual toggle in repo settings is needed.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -20,13 +20,9 @@ Everything is stored in `localStorage` on the device. Nothing goes to a server.
 
 ## First-time setup — enabling GitHub Pages
 
-GitHub Pages needs to be turned on once in the repo settings:
+Pages is enabled automatically by the workflow the first time it runs. The `actions/configure-pages` step uses `enablement: true`, which flips the repo's Pages source to "GitHub Actions" for you and creates the `github-pages` environment. No manual toggle in repo settings is needed.
 
-1. Go to **Settings → Pages** in this repo.
-2. Under **Build and deployment**, set **Source** to **GitHub Actions** (not "Deploy from a branch").
-3. Save.
-
-That's it. Any push to `main` or a `claude/**` branch will build and deploy automatically via `.github/workflows/pages.yml`. The first run also creates the `github-pages` environment.
+Any push to `main` or a `claude/**` branch will build and deploy automatically via `.github/workflows/pages.yml`.
 
 Once deployed, the site lives at:
 

@@ -55,13 +55,24 @@
   // Kind config — colors + icons
   // ─────────────────────────────────────────────────────────
   const KINDS = {
-    wake:  { label: 'Wake',  icon: '☼', accent: '#E87FA3', deep: '#D85C87', bgLight: '#FCE4EE', bgDark: '#3A1F2E', macro: true  },
-    feed:  { label: 'Feed',  icon: '♡', accent: '#F4A8B8', deep: '#E389A0', bgLight: '#FDEEF2', bgDark: '#2E1C25', macro: false },
-    nap:   { label: 'Nap',   icon: '☾', accent: '#A786D1', deep: '#8F6BC0', bgLight: '#EFE7F7', bgDark: '#221A33', macro: true  },
-    bath:  { label: 'Bath',  icon: '✿', accent: '#7FB8D4', deep: '#5F9BBD', bgLight: '#E5F1F8', bgDark: '#15232C', macro: false },
-    sleep: { label: 'Sleep', icon: '✦', accent: '#6B4E8C', deep: '#553D70', bgLight: '#E8DEF0', bgDark: '#1C1228', macro: true  },
+    wake:  { label: 'Wake',  icon: '☼', accent: '#E87FA3', deep: '#D85C87', bgLight: '#FCE4EE', bgDark: '#5A2E42', macro: true  },
+    feed:  { label: 'Feed',  icon: '♡', accent: '#F4A8B8', deep: '#E389A0', bgLight: '#FDEEF2', bgDark: '#4E2636', macro: false },
+    nap:   { label: 'Nap',   icon: '☾', accent: '#A786D1', deep: '#9778C2', bgLight: '#EFE7F7', bgDark: '#3A2A52', macro: true  },
+    bath:  { label: 'Bath',  icon: '✿', accent: '#7FB8D4', deep: '#5F9BBD', bgLight: '#E5F1F8', bgDark: '#1F3A4A', macro: true  },
+    sleep: { label: 'Sleep', icon: '✦', accent: '#8B6FB0', deep: '#7458A0', bgLight: '#E8DEF0', bgDark: '#2E1E3F', macro: true  },
   };
   const KIND_LIST = ['wake', 'feed', 'nap', 'bath', 'sleep'];
+
+  // Human-readable phase names (what "Right now" shows)
+  const PHASE_NAMES = {
+    wake:  'Awake',
+    nap:   'Napping',
+    bath:  'Bath time',
+    sleep: 'Sleeping',
+  };
+
+  // Which kinds "break" a phase (kick the baby into a new phase)
+  const MACRO_KINDS = new Set(['wake', 'nap', 'bath', 'sleep']);
 
   // ─────────────────────────────────────────────────────────
   // Wonder Weeks leaps — 10 leaps, canonical week numbers,
@@ -314,84 +325,124 @@
 
   // ─────────────────────────────────────────────────────────
   // Phase derivation
+  //
+  // Model: build a 3-day timeline (yesterday / today / tomorrow), walk it once
+  // to compute continuous "phase segments", then find the segment that
+  // contains `now`. Phase segment rules:
+  //
+  //   - A wake / nap / bath / sleep event starts a new segment of that kind.
+  //   - A feed event inside a wake segment continues wake (no new segment).
+  //   - A feed event inside a nap or sleep segment implicitly wakes the baby
+  //     and starts a new 'wake' segment (so "Nap" ends at the first feed,
+  //     which is how parents actually think about the day).
+  //
+  // This fixes the case where "Down for nap" at 4pm was incorrectly being
+  // reported as "Feed & bedtime" because the old backward-scan shifted
+  // future events into yesterday and matched the wrong macro event.
   // ─────────────────────────────────────────────────────────
   function derivePhases(now) {
-    const ev = schedule.events.slice().sort(byTime);
-    if (!ev.length) return null;
+    const base = schedule.events.slice().sort(byTime);
+    if (!base.length) return null;
+    const N = base.length;
 
-    // Find most recent past event (wraps to yesterday's last event)
-    let currentIdx = -1;
-    for (let i = ev.length - 1; i >= 0; i--) {
-      if (ev[i].time <= now) { currentIdx = i; break; }
+    // Build 3-day timeline: yesterday (-1440), today (0), tomorrow (+1440)
+    const tl = [];
+    const OFFSETS = [-1440, 0, 1440];
+    for (let oi = 0; oi < OFFSETS.length; oi++) {
+      const offset = OFFSETS[oi];
+      for (let i = 0; i < N; i++) {
+        tl.push({ event: base[i], time: base[i].time + offset });
+      }
     }
-    const wrapped = currentIdx === -1;
-    const current = wrapped ? ev[ev.length - 1] : ev[currentIdx];
-    const nextIdx = wrapped ? 0 : (currentIdx + 1) % ev.length;
-    const next = ev[nextIdx];
-    const nextTime = wrapped
-      ? ev[0].time                 // today's first event (we're in the pre-wake gap)
-      : (currentIdx + 1 < ev.length ? ev[currentIdx + 1].time : ev[0].time + 1440);
+    // Already sorted: each offset block is sorted and offsets are strictly
+    // increasing by 1440 while event times are 0..1439, so the blocks don't
+    // overlap.
 
-    const currentTime = wrapped ? ev[ev.length - 1].time - 1440 : ev[currentIdx].time;
+    // Walk timeline and compute segments [{start, end, kind, label}]
+    const segments = [];
+    let cur = null;
+    for (let i = 0; i < tl.length; i++) {
+      const e = tl[i].event;
+      const t = tl[i].time;
+      let kind;
+      if (MACRO_KINDS.has(e.kind)) {
+        kind = e.kind;
+      } else if (e.kind === 'feed') {
+        if (cur && (cur.kind === 'nap' || cur.kind === 'sleep')) {
+          kind = 'wake'; // implicit wake-up
+        } else if (cur) {
+          kind = cur.kind;
+        } else {
+          kind = 'wake';
+        }
+      } else {
+        kind = 'wake';
+      }
 
-    // Macro phase = latest macro event (wake / nap / sleep)
-    let macro = null, macroStart = null, macroEnd = null;
-    for (let i = ev.length - 1; i >= 0; i--) {
-      const e = ev[i];
-      const t = (wrapped || i <= currentIdx) ? e.time : e.time - 1440;
-      if (KINDS[e.kind].macro && t <= now) {
-        macro = e;
-        macroStart = t;
-        // find next macro after this one
-        for (let j = i + 1; j < ev.length; j++) {
-          if (KINDS[ev[j].kind].macro) { macroEnd = ev[j].time; break; }
-        }
-        if (macroEnd == null) {
-          // wrap to tomorrow's first macro
-          for (let j = 0; j < ev.length; j++) {
-            if (KINDS[ev[j].kind].macro) { macroEnd = ev[j].time + 1440; break; }
-          }
-        }
+      if (!cur || cur.kind !== kind) {
+        if (cur) cur.end = t;
+        cur = { start: t, end: null, kind: kind, label: e.label, startEvent: e };
+        segments.push(cur);
+      } else if (MACRO_KINDS.has(e.kind) && e.kind === cur.kind) {
+        // same-kind macro within an ongoing segment — refresh the label
+        cur.label = e.label;
+      }
+    }
+    if (cur && cur.end == null) cur.end = cur.start + 1440 * 3;
+
+    // Find the segment containing now
+    let segment = null;
+    for (let i = 0; i < segments.length; i++) {
+      if (segments[i].start <= now && now < segments[i].end) {
+        segment = segments[i];
         break;
       }
     }
-    if (macro == null) {
-      // before the first macro of the day: treat yesterday's last macro as current
-      for (let i = ev.length - 1; i >= 0; i--) {
-        if (KINDS[ev[i].kind].macro) {
-          macro = ev[i];
-          macroStart = ev[i].time - 1440;
-          for (let j = 0; j < ev.length; j++) {
-            if (KINDS[ev[j].kind].macro) { macroEnd = ev[j].time; break; }
-          }
-          break;
-        }
-      }
-    }
+    if (!segment) segment = segments[segments.length - 1];
 
-    // Micro activity = most recent non-macro event within window
+    // Most recent timeline entry ≤ now (for schedule list highlighting)
+    let ci = -1;
+    for (let i = tl.length - 1; i >= 0; i--) {
+      if (tl[i].time <= now) { ci = i; break; }
+    }
+    if (ci === -1) ci = 0;
+    const currentEntry = tl[ci];
+
+    // Next timeline entry > now
+    let nextEntry = null;
+    for (let i = 0; i < tl.length; i++) {
+      if (tl[i].time > now) { nextEntry = tl[i]; break; }
+    }
+    if (!nextEntry) nextEntry = tl[tl.length - 1];
+
+    // Micro activity — most recent feed within the window minutes.
+    // (We only show feeds as micro; bath is its own phase now.)
     let micro = null;
     const windowMin = settings.microActivityWindowMin || 40;
-    for (let i = ev.length - 1; i >= 0; i--) {
-      const e = ev[i];
-      const t = (wrapped || i <= currentIdx) ? e.time : e.time - 1440;
-      if (!KINDS[e.kind].macro && t <= now && (now - t) <= windowMin) {
-        micro = { event: e, start: t, ageMin: now - t };
+    for (let i = ci; i >= 0; i--) {
+      const age = now - tl[i].time;
+      if (age > windowMin) break;
+      if (tl[i].event.kind === 'feed') {
+        micro = { event: tl[i].event, start: tl[i].time, ageMin: age };
         break;
       }
     }
 
+    // Which base-event index is "current today" for the schedule list.
+    // Today block = indices [N, 2N).
+    const todayStart = N, todayEnd = 2 * N;
+    let currentBaseIdx = -1;
+    if (ci >= todayStart && ci < todayEnd) currentBaseIdx = ci - todayStart;
+
     return {
-      currentEvent: current,
-      currentTime,
-      nextEvent: next,
-      nextTime,
-      macro,
-      macroStart,
-      macroEnd,
-      micro,
-      wrapped,
-      events: ev,
+      base: base,
+      segment: segment,     // { start, end, kind, label }
+      currentEvent: currentEntry.event,
+      currentTime: currentEntry.time,
+      nextEvent: nextEntry.event,
+      nextTime: nextEntry.time,
+      micro: micro,
+      currentBaseIdx: currentBaseIdx,
     };
   }
 
@@ -432,34 +483,32 @@
     const info = ageInfo(settings.birthDate);
     document.getElementById('age-strip').innerHTML = ageLine(info);
 
-    // Theme driven by macro phase
-    const macroKind = (phases.macro && phases.macro.kind) || phases.currentEvent.kind;
-    applyKindAccent(macroKind);
+    // Theme + phase name driven by current segment
+    const seg = phases.segment;
+    applyKindAccent(seg.kind);
 
-    // Right-now
-    const macroName = phases.macro ? phases.macro.label : phases.currentEvent.label;
-    document.getElementById('now-name').textContent = macroName;
+    // Right-now: human phase name (Napping / Awake / Sleeping / Bath time)
+    document.getElementById('now-name').textContent = PHASE_NAMES[seg.kind] || seg.label;
 
     const nowSub = document.getElementById('now-sub');
     if (phases.micro) {
       const mk = KINDS[phases.micro.event.kind];
-      nowSub.innerHTML = mk.icon + '  currently <b>' + escapeHtml(phases.micro.event.label.toLowerCase()) + '</b>';
+      nowSub.innerHTML = mk.icon + '  currently <b>feeding</b>';
       nowSub.hidden = false;
     } else {
       nowSub.hidden = true;
     }
 
-    // Meta line — until next macro end
-    const endTime = phases.macroEnd != null ? phases.macroEnd : phases.nextTime;
+    // Meta line — until end of current segment
+    const endTime = seg.end;
     const remain = endTime - now;
     const untilLabel = fmtTime(((endTime % 1440) + 1440) % 1440);
     document.getElementById('now-meta').innerHTML =
       'until <b>' + untilLabel + '</b> &middot; ' + fmtDuration(remain) + ' to go';
 
     // Progress bar
-    const start = phases.macroStart != null ? phases.macroStart : phases.currentTime;
-    const span = Math.max(1, endTime - start);
-    const pct = Math.min(100, Math.max(0, ((now - start) / span) * 100));
+    const span = Math.max(1, endTime - seg.start);
+    const pct = Math.min(100, Math.max(0, ((now - seg.start) / span) * 100));
     document.getElementById('progress-fill').style.width = pct + '%';
 
     // Up next
@@ -470,7 +519,7 @@
       '<b>' + nextLabel + '</b> &middot; in ' + fmtDuration(untilNext);
 
     // Schedule list
-    renderSchedule(now, phases);
+    renderSchedule(phases);
 
     // Leap card
     renderLeap(info);
@@ -486,19 +535,16 @@
     document.getElementById('sched').innerHTML = '';
   }
 
-  function renderSchedule(now, phases) {
+  function renderSchedule(phases) {
     const sched = document.getElementById('sched');
     sched.innerHTML = '';
-    const ev = phases.events;
-    const currentId = phases.currentEvent.id;
+    const base = phases.base;
+    const ciBase = phases.currentBaseIdx; // -1 if nothing today has happened yet
 
-    // If wrapped (before today's first event), nothing counts as "past" today
-    const wrapped = phases.wrapped;
-
-    ev.forEach(function (e) {
+    base.forEach(function (e, bi) {
       const li = document.createElement('li');
-      const isCurrent = e.id === currentId && !wrapped;
-      const isPast = !wrapped && e.time < phases.currentEvent.time && e.id !== currentId;
+      const isCurrent = ciBase >= 0 && bi === ciBase;
+      const isPast = ciBase >= 0 && bi < ciBase;
 
       if (isPast) li.classList.add('past');
       if (isCurrent) li.classList.add('current');

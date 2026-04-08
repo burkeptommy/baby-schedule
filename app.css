@@ -29,24 +29,34 @@
 
   /* typography */
   --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+
+  /* past schedule items — subtle, overridden in dark mode */
+  --past-bg: transparent;
+  --past-ink: var(--ink-faint);
+  --past-dot: var(--rule-strong);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1A0F18;
-    --bg-elev: #251722;
-    --ink: #F5E4ED;
-    --ink-soft: #B59AA8;
-    --ink-faint: #6A4E5D;
-    --rule: #2E1D29;
-    --rule-strong: #3F2838;
+    --bg-elev: #2A1925;
+    --ink: #FBEBF2;
+    --ink-soft: #D7B9CA;
+    --ink-faint: #9E8294;      /* brighter — was #6A4E5D */
+    --rule: #3A2432;
+    --rule-strong: #4E3245;
 
     --accent: #F0A0BD;
-    --accent-deep: #F28DAE;
-    --current-bg: #3A1F2E;
+    --accent-deep: #F4B2CB;
+    --current-bg: #5A2E42;
 
     --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.25), 0 6px 20px rgba(0, 0, 0, 0.35);
     --shadow-pop: 0 6px 32px rgba(0, 0, 0, 0.5);
+
+    /* Subtle card background for past schedule items in dark mode */
+    --past-bg: rgba(250, 220, 235, 0.055);
+    --past-ink: #B99AAD;
+    --past-dot: #7A5D6D;
   }
 }
 
@@ -340,30 +350,49 @@ button { background: none; border: none; cursor: pointer; }
   font-variation-settings: "opsz" 30;
 }
 
-.sched li.past .t,
-.sched li.past .lbl {
-  color: var(--ink-faint);
+.sched li.past {
+  background: var(--past-bg);
+  margin: 0 -14px;
+  padding: 15px 14px;
+  border-radius: var(--r-md);
+  border-bottom-color: transparent;
 }
 
-.sched li.past .ico { opacity: 0.35; }
+.sched li.past + li.past {
+  margin-top: 2px;
+}
+
+.sched li.past + li:not(.past):not(.current) {
+  border-top: none;
+}
+
+.sched li.past .t,
+.sched li.past .lbl {
+  color: var(--past-ink);
+}
+
+.sched li.past .ico { opacity: 0.5; }
 
 .sched li.past .lbl {
   text-decoration: line-through;
-  text-decoration-color: var(--ink-faint);
+  text-decoration-color: var(--past-ink);
   text-decoration-thickness: 0.5px;
 }
 
-.sched li.past .dot { background: var(--rule-strong); }
+.sched li.past .dot { background: var(--past-dot); }
 
 .sched li.current {
   background: var(--current-bg);
-  margin: 0 -14px;
-  padding: 18px 14px;
+  margin: 6px -14px;
+  padding: 20px 14px;
   border-bottom-color: transparent;
   border-radius: var(--r-md);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04),
+              0 2px 16px rgba(0, 0, 0, 0.12);
 }
 
 .sched li.current + li { border-top: none; }
+.sched li.past + li.current { margin-top: 10px; }
 
 .sched li.current .t {
   color: var(--ink);
@@ -866,7 +895,8 @@ button { background: none; border: none; cursor: pointer; }
   .now { margin-bottom: 40px; }
   .next { margin-bottom: 44px; }
   .schedule { margin-bottom: 44px; }
-  .sched li.current { margin: 0 -10px; padding: 18px 10px; }
+  .sched li.past    { margin: 0 -10px; padding: 15px 10px; }
+  .sched li.current { margin: 6px -10px; padding: 20px 10px; }
   .leap { padding: 20px 18px 16px; }
   .leap-name { font-size: 23px; }
 }

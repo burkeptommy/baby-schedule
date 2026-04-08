@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Valerie">
+  <meta name="theme-color" content="#FFF5F9" id="theme-color">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Valerie &middot; a tiny rhythm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-name" id="brand-name">Valerie</span>
+        <span class="brand-heart" aria-hidden="true">&#9825;</span>
+      </div>
+      <div class="topbar-right">
+        <div class="clock" id="clock">&middot;</div>
+        <button class="icon-btn" id="settings-btn" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="age-strip" id="age-strip">&middot;</div>
+
+    <section class="now">
+      <div class="label">Right now</div>
+      <div class="now-name" id="now-name">&middot;</div>
+      <div class="now-sub" id="now-sub" hidden></div>
+      <div class="now-meta" id="now-meta">&middot;</div>
+      <div class="progress"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </section>
+
+    <section class="next">
+      <div class="label">Up next</div>
+      <div class="next-row">
+        <div class="next-name" id="next-name">&middot;</div>
+        <div class="next-when" id="next-when">&middot;</div>
+      </div>
+    </section>
+
+    <section class="schedule">
+      <div class="label">The whole day</div>
+      <ul class="sched" id="sched"></ul>
+    </section>
+
+    <section class="leap" id="leap-card">
+      <div class="leap-head">
+        <button class="leap-nav" id="leap-prev" aria-label="Previous leap">&lsaquo;</button>
+        <div class="leap-titles">
+          <div class="label" id="leap-kicker">Leap &middot;</div>
+          <div class="leap-name" id="leap-name">&middot;</div>
+          <div class="leap-weeks" id="leap-weeks">&middot;</div>
+        </div>
+        <button class="leap-nav" id="leap-next" aria-label="Next leap">&rsaquo;</button>
+      </div>
+      <div class="leap-desc" id="leap-desc">&middot;</div>
+      <ul class="milestones" id="milestones"></ul>
+      <button class="leap-jump" id="leap-jump" hidden>Jump to current leap</button>
+    </section>
+
+    <footer class="footer">
+      tap &amp; hold an event to edit &middot; add to home screen
+    </footer>
+  </div>
+
+  <!-- Settings modal -->
+  <div class="modal" id="settings-modal" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-sheet" role="dialog" aria-label="Settings">
+      <div class="modal-head">
+        <div class="modal-title">Settings</div>
+        <button class="icon-btn" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field">
+          <label for="field-name">Baby's name</label>
+          <input id="field-name" type="text" autocomplete="off" placeholder="Valerie">
+        </div>
+        <div class="field">
+          <label for="field-birth">Birth date</label>
+          <input id="field-birth" type="date">
+        </div>
+
+        <div class="section-head">
+          <div class="label">Schedule</div>
+          <button class="ghost-btn" id="add-row">+ Add event</button>
+        </div>
+        <ul class="editor" id="editor"></ul>
+
+        <div class="section-head">
+          <div class="label">Backup</div>
+        </div>
+        <div class="btn-row">
+          <button class="ghost-btn" id="export-btn">Export schedule</button>
+          <label class="ghost-btn" for="import-input">Import schedule</label>
+          <input id="import-input" type="file" accept="application/json,.json" hidden>
+        </div>
+
+        <div class="section-head">
+          <div class="label">Reset</div>
+        </div>
+        <div class="btn-row">
+          <button class="ghost-btn danger" id="reset-btn">Reset to default schedule</button>
+        </div>
+
+        <div class="note">
+          Everything saves to this device. Export a JSON backup to carry between phones.
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="primary-btn" id="save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- Confetti canvas -->
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>

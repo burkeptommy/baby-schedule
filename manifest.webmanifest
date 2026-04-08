@@ -1,0 +1,19 @@
+{
+  "name": "Valerie · a tiny rhythm",
+  "short_name": "Valerie",
+  "description": "A quiet little schedule app for Valerie's daily rhythm.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF5F9",
+  "theme_color": "#FFF5F9",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
